@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2
+
+- One tile on the dashboard instead of nineteen stacked widgets: instant power,
+  a gauge against rated power, daily and total energy, temperature, grid
+  voltage, status — and the per-string detail as soon as there is more than one
+  string. Three layouts, one per device family.
+- Detail commands are now hidden when created. Those of already-created devices
+  become hidden once, on update: show back whatever you want in the device's
+  Commands tab.
+- The inverter's rated power is read from the stick on its own and scales the
+  gauge. It stays editable by hand.
+- Three widget options: gauge, secondary figures, per-string detail.
+
 ## 0.1
 
 First release.

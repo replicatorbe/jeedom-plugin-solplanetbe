@@ -47,6 +47,33 @@ curl -s --max-time 5 "http://192.168.0.42:8484/getdev.cgi?device=2"
 A JSON answer containing `isn` confirms the address and gives you the inverter's
 serial number.
 
+## What you see on the dashboard
+
+Each device shows **one tile only**. That is a deliberate choice: nineteen
+stacked widgets cannot be read, whereas an inverter asks a single question —
+"how much is it producing?" — and a tile answers it in full.
+
+The inverter tile shows instant power large, a gauge against rated power
+(2.50 kW on a 3 kW inverter is 83 %; the figure alone would not say so), daily
+and total energy, temperature, grid voltage and status. As soon as there is more
+than one PV string, the detail of each is added: it is the comparison that shows
+a string in the shade or at fault, not the isolated value.
+
+The meter and the battery have their own tile: current direction and indexes on
+one side, state of charge and power on the other.
+
+**Every other command still exists, but is hidden.** They are historized and
+usable in scenarios, charts and views. To show one on the dashboard, tick
+"Display" in the device's *Commands* tab.
+
+Three settings are available on the tile itself, through the widget's "Advanced
+configuration" button: `gauge`, `facts` and `strings`, set to `0` to hide
+respectively the gauge, the secondary figures and the per-string detail.
+
+At night the tile dims and shows "Asleep — the stick is not answering". It keeps
+the last known value rather than emptying itself: you see at a glance that the
+data is no longer fresh, without losing the information.
+
 ## The devices
 
 One Jeedom device stands for **one physical device**. The three families share

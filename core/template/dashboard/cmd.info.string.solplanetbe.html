@@ -1,0 +1,317 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="solplanetbe" data-kind="" data-flow="idle" data-offline="0" data-alert="0" data-cmd_id="#id#" data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="#eqLogic_id#">
+  <div class="title #hide_name#">
+    <div class="cmdName">#name_display#</div>
+  </div>
+  <div class="content">
+    <div class="spAlert"></div>
+    <div class="spMain">
+      <i class="spIcon"></i>
+      <span class="spValue"></span>
+      <span class="spUnit"></span>
+    </div>
+    <div class="spGauge"><span></span></div>
+    <div class="spScale"></div>
+    <div class="spFacts"></div>
+    <div class="spStrings"></div>
+    <div class="spFoot"></div>
+  </div>
+  <div class="timeCmd label label-default #history#" data-type="info"></div>
+  <template>
+    <div>gauge : 0 ({{Masque la jauge de puissance}})</div>
+    <div>facts : 0 ({{Masque les chiffres secondaires}})</div>
+    <div>strings : 0 ({{Masque le détail par chaîne photovoltaïque}})</div>
+  </template>
+  <script>
+    (function () {
+      /* Une seule feuille de style pour toutes les tuiles du plugin, posée au
+         premier rendu. Le CSS d'un plugin n'est pas chargé sur le dashboard, et
+         les règles .content du coeur n'existent pas côté mobile : le gabarit
+         doit se suffire à lui-même. Aucune couleur en dur, tout vient du thème. */
+      if (!document.getElementById('solplanetbeWidgetCss')) {
+        var css = document.createElement('style')
+        css.id = 'solplanetbeWidgetCss'
+        css.textContent = [
+          '.cmd-widget[data-template="solplanetbe"]{display:flex;flex-direction:column;align-items:center;width:100%}',
+          '.cmd-widget[data-template="solplanetbe"] .cmdName{font-size:12px;line-height:16px;font-weight:400;color:var(--txt-color)}',
+          '.cmd-widget[data-template="solplanetbe"] .content{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;padding:0 6px 3px;gap:3px}',
+
+          /* Le bandeau d'erreur est le seul élément qui a le droit de crier. */
+          '.cmd-widget[data-template="solplanetbe"] .spAlert{display:none;width:100%;padding:3px 6px;font-size:.8em;font-weight:700;line-height:1.3;text-align:center;border-radius:var(--border-radius);background:var(--al-danger-color);color:#FFFFFF;overflow-wrap:anywhere}',
+          '.cmd-widget[data-template="solplanetbe"][data-alert="1"] .spAlert{display:block}',
+
+          /* La valeur principale. C'est elle qu'on vient lire : tout le reste
+             est du contexte, et se tient volontairement en retrait. */
+          '.cmd-widget[data-template="solplanetbe"] .spMain{display:flex;align-items:baseline;justify-content:center;gap:7px;line-height:1.05}',
+          '.cmd-widget[data-template="solplanetbe"] .spIcon{font-size:1.5em;align-self:center;opacity:.95;color:var(--txt-color)}',
+          '.cmd-widget[data-template="solplanetbe"] .spValue{font-size:2.05em;font-weight:700;color:var(--txt-color);letter-spacing:-.01em}',
+          '.cmd-widget[data-template="solplanetbe"] .spUnit{font-size:.92em;font-weight:600;color:var(--txt-color);opacity:.65}',
+
+          /* Le soleil, la charge et l\'injection prennent la couleur, parce
+             qu\'elles sont la bonne nouvelle. Le soutirage et la décharge
+             restent neutres : ce ne sont pas des alertes. */
+          '.cmd-widget[data-template="solplanetbe"][data-flow="produce"] .spIcon{color:var(--al-warning-color)}',
+          '.cmd-widget[data-template="solplanetbe"][data-flow="export"] .spIcon{color:var(--al-success-color)}',
+          '.cmd-widget[data-template="solplanetbe"][data-flow="charge"] .spIcon{color:var(--al-success-color)}',
+          /* La décharge et le soutirage prennent l\'ambre : ce ne sont pas des
+             alertes, mais laisser ces deux-là en gris ferait croire qu\'il ne
+             se passe rien alors qu\'il se passe l\'inverse de la charge. */
+          '.cmd-widget[data-template="solplanetbe"][data-flow="discharge"] .spIcon,',
+          '.cmd-widget[data-template="solplanetbe"][data-flow="import"] .spIcon{color:var(--al-warning-color)}',
+          '.cmd-widget[data-template="solplanetbe"][data-flow="idle"] .spIcon{opacity:.45}',
+          /* Hors ligne : la valeur s\'efface sans disparaître. La dernière
+             valeur connue reste lisible, mais ne se fait plus passer pour
+             l\'instantané. */
+          '.cmd-widget[data-template="solplanetbe"][data-offline="1"] .spValue,',
+          '.cmd-widget[data-template="solplanetbe"][data-offline="1"] .spUnit,',
+          '.cmd-widget[data-template="solplanetbe"][data-offline="1"] .spIcon{opacity:.4}',
+
+          /* La jauge. La hauteur de la barre dit la part de la puissance
+             nominale utilisée : le chiffre seul ne dit pas si 2,5 kW est
+             beaucoup pour cet onduleur-là. */
+          '.cmd-widget[data-template="solplanetbe"] .spGauge{display:none;width:92%;height:7px;border-radius:4px;background:var(--btnEq-default-color);overflow:hidden;margin-top:2px}',
+          '.cmd-widget[data-template="solplanetbe"] .spGauge.spOn{display:block}',
+          '.cmd-widget[data-template="solplanetbe"] .spGauge > span{display:block;height:100%;width:0;border-radius:4px;background:var(--al-warning-color);transition:width .4s ease}',
+          '.cmd-widget[data-template="solplanetbe"][data-flow="export"] .spGauge > span,',
+          '.cmd-widget[data-template="solplanetbe"][data-flow="charge"] .spGauge > span{background:var(--al-success-color)}',
+          '.cmd-widget[data-template="solplanetbe"][data-offline="1"] .spGauge > span{opacity:.35}',
+          '.cmd-widget[data-template="solplanetbe"] .spScale{font-size:.74em;color:var(--txt-color);opacity:.6;line-height:1.2}',
+
+          /* Les chiffres secondaires : libellé au-dessus, valeur en dessous,
+             pour qu\'une colonne se lise de haut en bas sans revenir en arrière. */
+          '.cmd-widget[data-template="solplanetbe"] .spFacts{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;width:100%;margin-top:3px}',
+          '.cmd-widget[data-template="solplanetbe"] .spFact{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:52px;flex:0 1 auto}',
+          '.cmd-widget[data-template="solplanetbe"] .spFactLabel{font-size:.68em;text-transform:uppercase;letter-spacing:.03em;color:var(--txt-color);opacity:.55;line-height:1.1}',
+          '.cmd-widget[data-template="solplanetbe"] .spFactValue{font-size:.92em;font-weight:600;color:var(--txt-color);line-height:1.15}',
+
+          '.cmd-widget[data-template="solplanetbe"] .spStrings{display:flex;flex-direction:column;align-items:center;gap:1px;width:100%;margin-top:2px}',
+          '.cmd-widget[data-template="solplanetbe"] .spString{font-size:.72em;color:var(--txt-color);opacity:.7;line-height:1.25}',
+
+          '.cmd-widget[data-template="solplanetbe"] .spFoot{font-size:.74em;color:var(--txt-color);opacity:.6;line-height:1.2;text-align:center;margin-top:2px}',
+          /* Une tuile en veille doit se voir sans couleur d\'alerte : la nuit
+             n\'est pas une panne, et un onduleur rouge tous les soirs finit par
+             ne plus être regardé. */
+          '.cmd-widget[data-template="solplanetbe"][data-offline="1"] .spFoot{opacity:.85;font-weight:600}'
+        ].join('')
+        document.head.appendChild(css)
+      }
+
+      var spShowGauge = !(domUtils.issetWidgetOptParam('#gauge#', 'gauge') && '#gauge#' == '0')
+      var spShowFacts = !(domUtils.issetWidgetOptParam('#facts#', 'facts') && '#facts#' == '0')
+      var spShowStrings = !(domUtils.issetWidgetOptParam('#strings#', 'strings') && '#strings#' == '0')
+
+      /* Format français : espace fine insécable pour les milliers, virgule pour
+         les décimales. toLocaleString ferait le travail, mais rend un espace
+         insécable ordinaire que certains thèmes coupent mal en fin de ligne. */
+      function spNum(_value, _decimals) {
+        if (_value === null || _value === undefined || _value === '' || isNaN(_value)) { return null }
+        var n = Number(_value).toFixed(_decimals)
+        var parts = n.split('.')
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+        return parts.length > 1 ? parts[0] + ',' + parts[1] : parts[0]
+      }
+
+      /* Au-delà du millier, le watt devient illisible : 2 563 W se lit moins
+         vite que 2,56 kW quand on cherche un ordre de grandeur. */
+      function spPower(_watts) {
+        if (_watts === null || _watts === undefined || isNaN(_watts)) { return { value: '-', unit: '' } }
+        var w = Math.abs(Number(_watts))
+        if (w >= 1000) { return { value: spNum(Number(_watts) / 1000, 2), unit: 'kW' } }
+        return { value: spNum(_watts, 0), unit: 'W' }
+      }
+
+      function spEnergy(_kwh) {
+        if (_kwh === null || _kwh === undefined || isNaN(_kwh)) { return '-' }
+        var k = Math.abs(Number(_kwh))
+        if (k >= 1000) { return spNum(_kwh, 0) + ' kWh' }
+        return spNum(_kwh, 1) + ' kWh'
+      }
+
+      function spFact(_container, _label, _value) {
+        if (_value === null || _value === undefined || _value === '-' || _value === '') { return }
+        var box = document.createElement('div')
+        box.className = 'spFact'
+        var label = document.createElement('div')
+        label.className = 'spFactLabel'
+        label.textContent = _label
+        var value = document.createElement('div')
+        value.className = 'spFactValue'
+        value.textContent = _value
+        box.appendChild(label)
+        box.appendChild(value)
+        _container.appendChild(box)
+      }
+
+      jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+        var cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]')
+        if (!is_object(cmd)) { return }
+
+        /* Un seul objet transporte toute la tuile : deux commandes distinctes
+           demanderaient deux rafraîchissements qui pourraient se croiser et
+           afficher la puissance d'aujourd'hui avec l'énergie d'hier. */
+        var data = null
+        try {
+          data = JSON.parse(_options.value)
+        } catch (_error) {
+          data = null
+        }
+
+        var icon = cmd.querySelector('.spIcon')
+        var value = cmd.querySelector('.spValue')
+        var unit = cmd.querySelector('.spUnit')
+        var gauge = cmd.querySelector('.spGauge')
+        var gaugeBar = cmd.querySelector('.spGauge > span')
+        var scale = cmd.querySelector('.spScale')
+        var facts = cmd.querySelector('.spFacts')
+        var strings = cmd.querySelector('.spStrings')
+        var foot = cmd.querySelector('.spFoot')
+        var alert = cmd.querySelector('.spAlert')
+
+        facts.innerHTML = ''
+        strings.innerHTML = ''
+        scale.textContent = ''
+        foot.textContent = ''
+        alert.textContent = ''
+        gauge.classList.remove('spOn')
+        cmd.setAttribute('data-alert', '0')
+
+        /* Rien reçu : surtout pas de zéro. Un équipement qui vient d'être créé
+           affirmerait qu'il produit 0 W alors qu'il ne sait rien encore. */
+        if (data === null) {
+          cmd.setAttribute('data-offline', '0')
+          cmd.setAttribute('data-flow', 'idle')
+          icon.className = 'spIcon fas fa-hourglass-half'
+          value.textContent = '-'
+          unit.textContent = ''
+          foot.textContent = '{{En attente du premier relevé}}'
+          return
+        }
+
+        var offline = (Number(data.online) !== 1)
+        cmd.setAttribute('data-offline', offline ? '1' : '0')
+        cmd.setAttribute('data-kind', String(data.type || ''))
+
+        /* ------------------------------------------------------- ONDULEUR */
+        if (data.type === 'inverter') {
+          var power = spPower(data.power)
+          value.textContent = power.value
+          unit.textContent = power.unit
+
+          var producing = (data.power !== null && data.power !== undefined && Number(data.power) > 0)
+          cmd.setAttribute('data-flow', producing ? 'produce' : 'idle')
+          icon.className = 'spIcon fas ' + (offline ? 'fa-moon' : (producing ? 'fa-sun' : 'fa-solar-panel'))
+
+          var max = Number(data.max || 0)
+          if (spShowGauge && max > 0 && data.power !== null && data.power !== undefined) {
+            var part = Math.max(0, Math.min(100, (Number(data.power) / max) * 100))
+            gauge.classList.add('spOn')
+            gaugeBar.style.width = part.toFixed(1) + '%'
+            scale.textContent = spPower(max).value + ' ' + spPower(max).unit + ' {{nominal}} · ' + Math.round(part) + ' %'
+          }
+
+          if (spShowFacts) {
+            spFact(facts, '{{Ce jour}}', spEnergy(data.today))
+            spFact(facts, '{{Total}}', spEnergy(data.total))
+            spFact(facts, '{{Temp.}}', spNum(data.temp, 1) === null ? null : spNum(data.temp, 1) + ' °C')
+            spFact(facts, '{{Réseau}}', spNum(data.volt, 1) === null ? null : spNum(data.volt, 1) + ' V')
+          }
+
+          if (spShowStrings && data.strings && data.strings.length > 1) {
+            for (var i = 0; i < data.strings.length; i++) {
+              var st = data.strings[i]
+              if (st.p === null || st.p === undefined) { continue }
+              var line = document.createElement('div')
+              line.className = 'spString'
+              line.textContent = 'PV' + (i + 1) + ' · ' + spNum(st.v, 1) + ' V · ' + spNum(st.i, 2) + ' A · ' + spNum(st.p, 0) + ' W'
+              strings.appendChild(line)
+            }
+          }
+
+          if (offline) {
+            foot.textContent = '{{En veille — la clé ne répond pas}}'
+          } else if (data.status) {
+            foot.textContent = data.status
+          }
+        }
+
+        /* -------------------------------------------------------- COMPTEUR */
+        if (data.type === 'meter') {
+          var grid = (data.power === null || data.power === undefined) ? null : Number(data.power)
+          var shown = spPower(grid === null ? null : Math.abs(grid))
+          value.textContent = shown.value
+          unit.textContent = shown.unit
+
+          var exporting = (grid !== null && grid < 0)
+          cmd.setAttribute('data-flow', grid === null ? 'idle' : (exporting ? 'export' : (grid > 0 ? 'import' : 'idle')))
+          icon.className = 'spIcon fas ' + (exporting ? 'fa-arrow-up' : (grid > 0 ? 'fa-arrow-down' : 'fa-equals'))
+
+          if (spShowFacts) {
+            spFact(facts, '{{Soutiré ce jour}}', spEnergy(data.import_today))
+            spFact(facts, '{{Injecté ce jour}}', spEnergy(data.export_today))
+            spFact(facts, '{{Soutirage}}', spEnergy(data.import_total))
+            spFact(facts, '{{Injection}}', spEnergy(data.export_total))
+          }
+
+          if (offline) {
+            foot.textContent = '{{Compteur injoignable}}'
+          } else if (grid !== null) {
+            foot.textContent = exporting ? '{{Injection vers le réseau}}' : (grid > 0 ? '{{Soutirage sur le réseau}}' : '{{Équilibre}}')
+          }
+        }
+
+        /* -------------------------------------------------------- BATTERIE */
+        if (data.type === 'battery') {
+          var soc = (data.soc === null || data.soc === undefined) ? null : Number(data.soc)
+          value.textContent = soc === null ? '-' : spNum(soc, 0)
+          unit.textContent = soc === null ? '' : '%'
+
+          var bp = (data.power === null || data.power === undefined) ? null : Number(data.power)
+          var charging = (bp !== null && bp > 0)
+          cmd.setAttribute('data-flow', bp === null || bp === 0 ? 'idle' : (charging ? 'charge' : 'discharge'))
+
+          /* L\'icône porte le niveau, pas seulement l\'état : c\'est le niveau
+             qu\'on cherche d\'un coup d\'oeil sur une batterie. */
+          var level = 'fa-battery-empty'
+          if (soc !== null) {
+            if (soc >= 87) { level = 'fa-battery-full' }
+            else if (soc >= 62) { level = 'fa-battery-three-quarters' }
+            else if (soc >= 37) { level = 'fa-battery-half' }
+            else if (soc >= 12) { level = 'fa-battery-quarter' }
+          }
+          icon.className = 'spIcon fas ' + level
+
+          if (spShowGauge && soc !== null) {
+            gauge.classList.add('spOn')
+            gaugeBar.style.width = Math.max(0, Math.min(100, soc)).toFixed(1) + '%'
+          }
+
+          if (spShowFacts) {
+            spFact(facts, charging ? '{{Charge}}' : '{{Décharge}}', bp === null ? null : spPower(Math.abs(bp)).value + ' ' + spPower(Math.abs(bp)).unit)
+            spFact(facts, '{{Solaire}}', data.pv === null || data.pv === undefined ? null : spPower(data.pv).value + ' ' + spPower(data.pv).unit)
+            spFact(facts, '{{Santé}}', spNum(data.soh, 0) === null ? null : spNum(data.soh, 0) + ' %')
+            spFact(facts, '{{Temp.}}', spNum(data.temp, 1) === null ? null : spNum(data.temp, 1) + ' °C')
+          }
+
+          if (offline) {
+            foot.textContent = '{{Batterie injoignable}}'
+          } else if (data.status) {
+            foot.textContent = data.status
+          }
+        }
+
+        /* Une erreur remontée par l\'onduleur passe avant tout le reste. */
+        if (data.error) {
+          cmd.setAttribute('data-alert', '1')
+          alert.textContent = data.error
+        }
+
+        jeedom.cmd.displayDuration(_options.valueDate, cmd.querySelector('.timeCmd'), '#time#')
+      })
+
+      /* display_value reste vide : le coeur n'échappe que les apostrophes dans
+         cette valeur, ce qui ne protège pas d'une balise de fermeture de bloc.
+         La tuile lit #value#, déjà assaini côté PHP par json_encode et ses
+         drapeaux hexadécimaux. */
+      jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#', unit: '' }])
+    })()
+  </script>
+</div>

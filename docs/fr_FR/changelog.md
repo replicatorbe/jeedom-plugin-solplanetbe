@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2
+
+- Une tuile sur le dashboard, à la place des dix-neuf widgets empilés :
+  puissance instantanée, jauge par rapport à la puissance nominale, énergie du
+  jour et totale, température, tension réseau, état — et le détail par chaîne
+  photovoltaïque dès qu'il y en a plusieurs. Trois présentations, une par
+  famille d'appareils.
+- Les commandes de détail sont désormais masquées à la création. Celles des
+  appareils déjà créés le deviennent une seule fois, à la mise à jour :
+  réaffichez ce que vous voulez dans l'onglet Commandes de l'équipement.
+- La puissance nominale de l'onduleur est lue toute seule sur la clé et sert
+  d'échelle à la jauge. Elle reste modifiable à la main.
+- Trois options de widget : jauge, chiffres secondaires, détail par chaîne.
+
 ## 0.1
 
 Première version.

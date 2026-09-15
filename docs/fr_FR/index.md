@@ -49,6 +49,36 @@ curl -s --max-time 5 "http://192.168.0.42:8484/getdev.cgi?device=2"
 Une réponse JSON contenant `isn` confirme l'adresse et vous donne le numéro de
 série de l'onduleur.
 
+## Ce que vous voyez sur le dashboard
+
+Chaque équipement n'affiche **qu'une tuile**. C'est un choix : dix-neuf widgets
+empilés ne se lisent pas, alors qu'un onduleur pose une question unique — « ça
+produit combien ? » — et une tuile y répond en entier.
+
+La tuile de l'onduleur montre la puissance instantanée en grand, une jauge par
+rapport à la puissance nominale (2,50 kW sur un onduleur de 3 kW, c'est 83 % ;
+le chiffre seul ne le dirait pas), l'énergie du jour et l'énergie totale, la
+température, la tension réseau et l'état. Dès qu'il y a plus d'une chaîne
+photovoltaïque, le détail de chacune s'ajoute : c'est la comparaison qui montre
+qu'une chaîne est à l'ombre ou en défaut, pas la valeur isolée.
+
+Le compteur et la batterie ont leur propre tuile : sens du courant et index
+d'un côté, état de charge et puissance de l'autre.
+
+**Toutes les autres commandes existent, mais sont masquées.** Elles sont
+historisées et utilisables en scénario, en courbe ou en vue. Pour en afficher
+une sur le dashboard, cochez « Afficher » dans l'onglet *Commandes* de
+l'équipement.
+
+Trois réglages sont disponibles sur la tuile elle-même, par le bouton
+« Configuration avancée » du widget : `gauge`, `facts` et `strings`, à mettre à
+`0` pour masquer respectivement la jauge, les chiffres secondaires et le détail
+par chaîne.
+
+La nuit, la tuile s'estompe et affiche « En veille — la clé ne répond pas ».
+Elle garde la dernière valeur connue plutôt que de se vider : on voit d'un coup
+d'œil que la donnée n'est plus fraîche, sans perdre l'information.
+
 ## Les équipements
 
 Un équipement Jeedom représente **un appareil physique**. Les trois familles

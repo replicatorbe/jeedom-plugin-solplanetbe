@@ -41,6 +41,13 @@ function solplanetbe_update() {
     try {
         $count = solplanetbe::rebuildCommands();
         log::add('solplanetbe', 'info', sprintf(__('Mise à jour : %d appareil(s) revu(s).', __FILE__), $count));
+
+        /* Les appareils créés avant la tuile portent leurs commandes de détail
+         * en visible, et empilent donc autant de widgets sur le dashboard. */
+        $masquees = solplanetbe::relayout();
+        if ($masquees > 0) {
+            log::add('solplanetbe', 'info', sprintf(__('Présentation : %d commande(s) de détail masquée(s), la tuile devient le seul widget. Réaffichez ce que vous voulez dans l\'onglet Commandes.', __FILE__), $masquees));
+        }
     } catch (Throwable $e) {
         log::add('solplanetbe', 'error', __('Mise à jour des commandes :', __FILE__) . ' ' . $e->getMessage());
     }

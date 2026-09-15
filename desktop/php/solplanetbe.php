@@ -184,6 +184,19 @@ $icons = array(
 							</div>
 
 							<div class="form-group">
+								<label class="col-sm-3 control-label">{{Puissance nominale}}</label>
+								<div class="col-sm-5">
+									<div class="input-group">
+										<input type="number" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="rate" placeholder="3000">
+										<span class="input-group-addon">W</span>
+									</div>
+								</div>
+								<div class="col-sm-4">
+									<span class="help-block" style="margin:0;">{{Lue toute seule sur la clé. Elle sert d'échelle à la jauge de la tuile : sans elle, 2 500 W ne dit pas si l'onduleur est à la peine ou au maximum.}}</span>
+								</div>
+							</div>
+
+							<div class="form-group">
 								<label class="col-sm-3 control-label">{{Relever toutes les}}</label>
 								<div class="col-sm-5">
 									<select class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="interval">

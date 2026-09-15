@@ -446,6 +446,9 @@ class solplanetbe extends eqLogic {
                 'ip'      => $_ip,
                 'sn'      => $sn,
                 'model'   => $model,
+                /* La puissance nominale ne figure que dans l'inventaire, pas
+                 * dans les données de production : c'est ici ou nulle part. */
+                'rate'    => isset($inverter['rate']) ? (int) $inverter['rate'] : 0,
                 'name'    => trim('Onduleur ' . $model),
             );
 
@@ -535,6 +538,7 @@ class solplanetbe extends eqLogic {
 
             $eqLogic->setEqType_name(__CLASS__);
             $eqLogic->setConfiguration('model', isset($device['model']) ? (string) $device['model'] : '');
+            $eqLogic->setConfiguration('rate', isset($device['rate']) ? (int) $device['rate'] : 0);
             $eqLogic->setConfiguration('interval', self::DEFAULT_INTERVAL);
             $eqLogic->setIsEnable(1);
             $eqLogic->setIsVisible(1);
@@ -656,7 +660,7 @@ class solplanetbe extends eqLogic {
      * nom, sa visibilité et son historisation appartiennent à l'utilisateur dès
      * qu'il y a touché.
      */
-    private function addCmdIfMissing($_logicalId, $_name, $_subType, $_unit, $_generic, $_order) {
+    private function addCmdIfMissing($_logicalId, $_name, $_type, $_subType, $_options = array()) {
         $cmd = $this->getCmd(null, $_logicalId);
         if (is_object($cmd)) {
             return $cmd;
@@ -665,51 +669,74 @@ class solplanetbe extends eqLogic {
         $cmd = new solplanetbeCmd();
         $cmd->setEqLogic_id($this->getId());
         $cmd->setLogicalId($_logicalId);
-        $cmd->setName(__($_name, __FILE__));
-        $cmd->setType('info');
+
+        /* Unicité (eqLogic_id, name) en base : un nom déjà pris ferait échouer
+         * tout l'enregistrement de l'équipement, pas seulement cette commande. */
+        $name = __($_name, __FILE__);
+        if (is_object(cmd::byEqLogicIdCmdName($this->getId(), $name))) {
+            $name .= ' (' . $_logicalId . ')';
+        }
+        $cmd->setName($name);
+        $cmd->setType($_type);
         $cmd->setSubType($_subType);
-        $cmd->setOrder($_order);
-        $cmd->setIsVisible(1);
+
+        /*
+         * Masquées par défaut. C'est le choix qui fait toute la différence sur
+         * le dashboard : dix-neuf widgets empilés ne se lisent pas, alors qu'un
+         * onduleur pose une question unique — « ça produit combien ? ». La tuile
+         * y répond en entier, le reste attend dans l'onglet Commandes que
+         * l'utilisateur en ait besoin.
+         */
+        $cmd->setIsVisible(isset($_options['isVisible']) ? $_options['isVisible'] : 0);
         /* Seules les grandeurs numériques valent d'être historisées : un état
          * textuel remplirait la base sans rien apprendre sur une courbe. */
-        $cmd->setIsHistorized($_subType === 'numeric' ? 1 : 0);
-        if ($_unit !== '') {
-            $cmd->setUnite($_unit);
-        }
-        if ($_generic !== '') {
-            $cmd->setGeneric_type($_generic);
-        }
+        $cmd->setIsHistorized(isset($_options['isHistorized']) ? $_options['isHistorized'] : 0);
+
+        if (isset($_options['order']))   { $cmd->setOrder($_options['order']); }
+        if (!empty($_options['unite']))   { $cmd->setUnite($_options['unite']); }
+        if (!empty($_options['generic'])) { $cmd->setGeneric_type($_options['generic']); }
         /* Le nom du gabarit est préfixé de l'identifiant du plugin : c'est ce
-         * que cmd::getWidgetTemplateCode() attend pour aller le chercher dans
-         * templateWidget(). Sans le préfixe, le coeur cherche un fichier du
-         * coeur portant ce nom, ne le trouve pas, et retombe sur l'affichage par
-         * défaut sans rien signaler. */
-        if ($_logicalId === 'en_ligne') {
-            $cmd->setTemplate('dashboard', 'solplanetbe::connexion');
-            $cmd->setTemplate('mobile', 'solplanetbe::connexion');
+         * que cmd::getWidgetTemplateCode() attend. Sans le préfixe, le coeur
+         * cherche un gabarit du coeur portant ce nom, ne le trouve pas, et
+         * retombe sur l'affichage par défaut sans rien signaler. */
+        if (!empty($_options['template'])) {
+            $cmd->setTemplate('dashboard', $_options['template']);
+            $cmd->setTemplate('mobile', $_options['template']);
         }
         $cmd->save();
         return $cmd;
     }
 
+    /* Le nom de la tuile, c'est-à-dire ce que l'équipement raconte en un mot. */
+    public function tileName() {
+        switch ($this->getConfiguration('devtype', self::TYPE_INVERTER)) {
+            case self::TYPE_METER:   return 'Réseau';
+            case self::TYPE_BATTERY: return 'Batterie';
+            default:                 return 'Production';
+        }
+    }
+
     public function createCommands() {
-        $order = 1;
+        $order = 0;
+
+        $this->addCmdIfMissing('resume', $this->tileName(), 'info', 'string', array(
+            'order' => $order++, 'isVisible' => 1,
+            'template' => __CLASS__ . '::' . __CLASS__,
+        ));
+
         foreach ($this->catalog() as $logicalId => $definition) {
-            $this->addCmdIfMissing($logicalId, $definition[0], $definition[1], $definition[2], $definition[3], $order++);
+            $this->addCmdIfMissing($logicalId, $definition[0], 'info', $definition[1], array(
+                'order'        => $order++,
+                'isHistorized' => $definition[1] === 'numeric' ? 1 : 0,
+                'unite'        => $definition[2],
+                'generic'      => $definition[3],
+                'template'     => ($logicalId === 'en_ligne') ? __CLASS__ . '::connexion' : '',
+            ));
         }
 
-        $refresh = $this->getCmd(null, 'rafraichir');
-        if (!is_object($refresh)) {
-            $refresh = new solplanetbeCmd();
-            $refresh->setEqLogic_id($this->getId());
-            $refresh->setLogicalId('rafraichir');
-            $refresh->setName(__('Rafraîchir', __FILE__));
-            $refresh->setType('action');
-            $refresh->setSubType('other');
-            $refresh->setOrder($order);
-            $refresh->setIsVisible(1);
-            $refresh->save();
-        }
+        $this->addCmdIfMissing('rafraichir', 'Rafraîchir', 'action', 'other', array(
+            'order' => $order++, 'isVisible' => 1,
+        ));
     }
 
     /*
@@ -717,6 +744,39 @@ class solplanetbe extends eqLogic {
      * des commandes : createCommands() ne tourne qu'au postSave. Hors ligne,
      * volontairement — voir plugin_info/install.php.
      */
+    /*
+     * Rattrapage de présentation pour les équipements créés avant la tuile. Ils
+     * portent dix-neuf commandes visibles, ce qui empile dix-neuf widgets sur le
+     * dashboard ; on les masque pour ne laisser que la tuile et le bouton.
+     *
+     * Exécuté une seule fois, et le drapeau est posé au niveau du plugin et non
+     * de l'équipement : dans le cache, un vidage le rejouerait et effacerait les
+     * commandes que l'utilisateur aurait choisi de réafficher entre-temps.
+     */
+    public static function relayout() {
+        if ((int) config::byKey('layout_migrated', __CLASS__, 0) === 1) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach (self::byType(__CLASS__) as $eqLogic) {
+            $eqLogic->createCommands();
+            foreach (cmd::byEqLogicId($eqLogic->getId()) as $cmd) {
+                if (in_array($cmd->getLogicalId(), array('resume', 'rafraichir'), true)) {
+                    continue;
+                }
+                if ((int) $cmd->getIsVisible() === 0) {
+                    continue;
+                }
+                $cmd->setIsVisible(0);
+                $cmd->save();
+                $count++;
+            }
+        }
+        config::save('layout_migrated', 1, __CLASS__);
+        return $count;
+    }
+
     public static function rebuildCommands() {
         $count = 0;
         foreach (self::byType(__CLASS__) as $eqLogic) {
@@ -808,11 +868,19 @@ class solplanetbe extends eqLogic {
         $this->clearFailure();
 
         $this->adjustShape($raw);
+        $this->learnRate();
 
-        foreach ($this->values($raw) as $logicalId => $value) {
+        $values = $this->values($raw);
+        foreach ($values as $logicalId => $value) {
             $this->publishCmd($logicalId, $value);
         }
         $this->publishCmd('en_ligne', 1);
+
+        /* Mémorisées pour la tuile : hors ligne, il n'y a plus de réponse à
+         * décoder, et une tuile vide en dirait moins que la dernière valeur
+         * connue accompagnée de la mention « en veille ». */
+        $this->setCache('values', $values);
+        $this->publishTile($values, true);
         $this->refreshWidget();
 
         return true;
@@ -1034,6 +1102,150 @@ class solplanetbe extends eqLogic {
         return empty($labels) ? sprintf(__('Erreur %s', __FILE__), $bits) : implode(', ', $labels);
     }
 
+    /* ================================================================= TUILE */
+
+    /*
+     * La puissance nominale de l'onduleur sert d'échelle à la jauge de la
+     * tuile. Elle n'est pas dans les données de production : il faut la
+     * demander à l'inventaire. Une fois apprise, elle ne change plus — on ne
+     * réessaie donc qu'une fois par jour tant qu'elle manque, pour ne pas
+     * doubler chaque relevé d'un appel inutile.
+     */
+    private function learnRate() {
+        if ($this->getConfiguration('devtype') !== self::TYPE_INVERTER) {
+            return;
+        }
+        if ((int) $this->getConfiguration('rate', 0) > 0) {
+            return;
+        }
+        if (time() - (int) $this->getCache('rate_tried', 0) < 86400) {
+            return;
+        }
+        $this->setCache('rate_tried', time());
+
+        try {
+            $inventaire = self::query($this->getConfiguration('ip'), 'getdev.cgi?device=2');
+            $sn = trim((string) $this->getConfiguration('sn'));
+            foreach (isset($inventaire['inv']) ? $inventaire['inv'] : array() as $onduleur) {
+                if (!isset($onduleur['isn']) || trim((string) $onduleur['isn']) !== $sn) {
+                    continue;
+                }
+                if (isset($onduleur['rate']) && (int) $onduleur['rate'] > 0) {
+                    $this->setConfiguration('rate', (int) $onduleur['rate']);
+                    $this->save();
+                }
+                return;
+            }
+        } catch (Throwable $e) {
+            log::add(__CLASS__, 'debug', __('Puissance nominale non lue :', __FILE__) . ' ' . $e->getMessage());
+        }
+    }
+
+    /*
+     * L'échelle de la jauge. La puissance nominale si on la connaît ; sinon le
+     * maximum déjà vu, qui s'ajuste tout seul au fil des jours et vaut mieux
+     * qu'une jauge figée sur une valeur inventée.
+     */
+    public function gaugeMax($_power) {
+        $rate = (int) $this->getConfiguration('rate', 0);
+        if ($rate > 0) {
+            return $rate;
+        }
+        $peak = (float) $this->getCache('peak', 0);
+        if ($_power !== null && $_power > $peak) {
+            $peak = (float) $_power;
+            $this->setCache('peak', $peak);
+        }
+        return $peak > 0 ? $peak : 0;
+    }
+
+    private function publishTile($_values, $_online) {
+        $this->publishCmd('resume', $this->buildResume($_values, $_online));
+    }
+
+    /*
+     * Tout ce que la tuile affiche tient dans un seul objet. Deux commandes
+     * distinctes demanderaient deux rafraîchissements qui pourraient se croiser
+     * et montrer une puissance d'aujourd'hui avec l'énergie d'hier.
+     *
+     * Les clés absentes restent absentes : le gabarit sait afficher un tiret, et
+     * un zéro inventé ici deviendrait un zéro affirmé à l'écran.
+     */
+    public function buildResume($_values, $_online) {
+        $v = is_array($_values) ? $_values : array();
+        $lire = function ($_cle) use ($v) {
+            return array_key_exists($_cle, $v) && $v[$_cle] !== null ? $v[$_cle] : null;
+        };
+
+        $payload = array(
+            'type'   => $this->getConfiguration('devtype', self::TYPE_INVERTER),
+            'online' => $_online ? 1 : 0,
+            'at'     => time(),
+        );
+
+        switch ($payload['type']) {
+            case self::TYPE_METER:
+                $payload['power']        = $lire('puissance_reseau');
+                $payload['import_today'] = $lire('import_jour');
+                $payload['export_today'] = $lire('export_jour');
+                $payload['import_total'] = $lire('import_total');
+                $payload['export_total'] = $lire('export_total');
+                break;
+
+            case self::TYPE_BATTERY:
+                $payload['soc']    = $lire('soc');
+                $payload['soh']    = $lire('soh');
+                $payload['power']  = $lire('puissance');
+                $payload['temp']   = $lire('temperature');
+                $payload['volt']   = $lire('tension');
+                $payload['pv']     = $lire('puissance_pv');
+                $payload['today']  = $lire('pv_jour');
+                $payload['total']  = $lire('pv_total');
+                $payload['status'] = $lire('etat');
+                $payload['error']  = $lire('libelle_erreur');
+                break;
+
+            default:
+                $payload['power']  = $lire('puissance');
+                $payload['max']    = $this->gaugeMax($lire('puissance'));
+                $payload['pv']     = $lire('puissance_pv') !== null ? $lire('puissance_pv') : $lire('puissance_pv_1');
+                $payload['today']  = $lire('energie_jour');
+                $payload['total']  = $lire('energie_totale');
+                $payload['temp']   = $lire('temperature');
+                $payload['volt']   = $lire('tension_ac_1');
+                $payload['freq']   = $lire('frequence');
+                $payload['status'] = $lire('etat');
+                $payload['error']  = ($lire('code_erreur') !== null && (int) $lire('code_erreur') !== 0)
+                    ? $lire('libelle_erreur') : null;
+
+                /* Le détail par chaîne n'a de sens qu'à partir de deux : c'est
+                 * la comparaison qui montre qu'une chaîne est à l'ombre ou en
+                 * défaut, pas la valeur isolée. */
+                $chaines = array();
+                $shape = $this->shape();
+                if ($shape['mppt'] > 1) {
+                    for ($i = 1; $i <= $shape['mppt']; $i++) {
+                        $chaines[] = array(
+                            'v' => $lire('tension_pv_' . $i),
+                            'i' => $lire('courant_pv_' . $i),
+                            'p' => $lire('puissance_pv_' . $i),
+                        );
+                    }
+                }
+                $payload['strings'] = $chaines;
+                break;
+        }
+
+        /*
+         * La valeur atterrit entre apostrophes dans un bloc de script du
+         * gabarit. Les drapeaux hexadécimaux mettent apostrophes, guillemets et
+         * chevrons hors d'état de nuire : rien ici ne vient de l'utilisateur,
+         * mais la tuile ne doit pas devenir une faille le jour où un libellé
+         * viendra d'ailleurs.
+         */
+        return json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP);
+    }
+
     /* ======================================================== HORS LIGNE */
 
     /*
@@ -1047,25 +1259,28 @@ class solplanetbe extends eqLogic {
      */
     private function applyOffline() {
         $this->publishCmd('en_ligne', 0);
+        $values = $this->getCache('values', array());
 
-        if ((int) $this->getConfiguration('zero_when_offline', 1) !== 1) {
-            $this->refreshWidget();
-            return;
+        if ((int) $this->getConfiguration('zero_when_offline', 1) === 1) {
+            $zeroed = array('puissance', 'puissance_pv', 'puissance_apparente', 'puissance_reactive');
+            $shape = $this->shape();
+            for ($i = 1; $i <= $shape['phases']; $i++) {
+                $zeroed[] = 'courant_ac_' . $i;
+                $zeroed[] = 'puissance_ac_' . $i;
+            }
+            for ($i = 1; $i <= $shape['mppt']; $i++) {
+                $zeroed[] = 'courant_pv_' . $i;
+                $zeroed[] = 'puissance_pv_' . $i;
+            }
+            foreach ($zeroed as $logicalId) {
+                $this->publishCmd($logicalId, 0);
+                if (array_key_exists($logicalId, $values)) {
+                    $values[$logicalId] = 0;
+                }
+            }
         }
 
-        $zeroed = array('puissance', 'puissance_pv', 'puissance_apparente', 'puissance_reactive');
-        $shape = $this->shape();
-        for ($i = 1; $i <= $shape['phases']; $i++) {
-            $zeroed[] = 'courant_ac_' . $i;
-            $zeroed[] = 'puissance_ac_' . $i;
-        }
-        for ($i = 1; $i <= $shape['mppt']; $i++) {
-            $zeroed[] = 'courant_pv_' . $i;
-            $zeroed[] = 'puissance_pv_' . $i;
-        }
-        foreach ($zeroed as $logicalId) {
-            $this->publishCmd($logicalId, 0);
-        }
+        $this->publishTile($values, false);
         $this->refreshWidget();
     }
 

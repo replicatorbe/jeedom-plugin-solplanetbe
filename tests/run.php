@@ -36,6 +36,23 @@ function check($_label, $_actual, $_expected) {
     }
 }
 
+/*
+ * Comparaison numérique tolérante au type. JSON ne distingue pas 2577,0 de
+ * 2577 : json_encode rend « 2577 » et json_decode un entier. Un === sur la
+ * valeur relue échouerait sur une différence qui n'existe pas.
+ */
+function checkNum($_label, $_actual, $_expected) {
+    global $passed, $failed;
+    if (is_numeric($_actual) && abs((float) $_actual - (float) $_expected) < 0.0001) {
+        $passed++;
+        printf("  ok    %-54s %s\n", $_label, var_export($_actual, true));
+    } else {
+        $failed++;
+        printf("  ECHEC %-54s obtenu %s, attendu %s\n", $_label,
+            var_export($_actual, true), var_export($_expected, true));
+    }
+}
+
 function section($_title) {
     echo "\n" . $_title . "\n" . str_repeat('-', strlen($_title)) . "\n";
 }
@@ -290,6 +307,76 @@ check('point d\'accès onduleur', $eq->endpoint(), 'getdevdata.cgi?device=2&sn=M
 $eq = device(solplanetbe::TYPE_INVERTER);
 check('forme par défaut', $eq->shape(), array('phases' => 1, 'mppt' => 1));
 
+/* ================================================================== TUILE */
+section('Tuile du dashboard');
+
+/* La tuile est le seul widget visible par défaut. Elle transporte tout ce
+ * qu'elle affiche dans un objet unique : deux commandes distinctes
+ * demanderaient deux rafraîchissements qui pourraient se croiser. */
+$raw = fixture('inverter_asw3000s');
+$eq = device(solplanetbe::TYPE_INVERTER);
+$eq->setConfiguration('rate', 3000);
+$t = json_decode($eq->buildResume($eq->values($raw), true), true);
+
+check('type', $t['type'], 'inverter');
+check('en ligne', $t['online'], 1);
+checkNum('puissance', $t['power'], 2577.0);
+checkNum('echelle de la jauge = puissance nominale', $t['max'], 3000);
+checkNum('energie du jour', $t['today'], 3.9);
+checkNum('energie totale', $t['total'], 14668.4);
+check('etat', $t['status'], 'Normal');
+/* Pas d'erreur : le libellé ne doit pas remonter « Aucune erreur » dans le
+ * bandeau rouge de la tuile, qui ne s'affiche que s'il y a vraiment quelque
+ * chose à dire. */
+check('aucun bandeau d\'erreur', $t['error'], null);
+check('une seule chaine : pas de detail', $t['strings'], array());
+
+/* Faute de puissance nominale, la jauge se cale sur le maximum déjà vu : elle
+ * s'ajuste toute seule au fil des jours plutôt que de rester figée sur une
+ * valeur inventée. */
+$eq = device(solplanetbe::TYPE_INVERTER);
+$t = json_decode($eq->buildResume($eq->values($raw), true), true);
+checkNum('sans nominal : jauge calee sur le maximum vu', $t['max'], 2577.0);
+
+/* Une erreur réelle, elle, remonte. */
+$eq = device(solplanetbe::TYPE_INVERTER, array('phases' => 1, 'mppt' => 2));
+$t = json_decode($eq->buildResume($eq->values(fixture('inverter_offline')), true), true);
+check('erreur remontee dans la tuile', $t['error'], 'Onduleur hors ligne');
+check('deux chaines : detail present', count($t['strings']), 2);
+
+/* Hors ligne, la tuile garde la dernière valeur connue mais ne se fait plus
+ * passer pour l'instantané : c'est le gabarit qui l'estompe. */
+$eq = device(solplanetbe::TYPE_INVERTER);
+$t = json_decode($eq->buildResume($eq->values($raw), false), true);
+check('hors ligne', $t['online'], 0);
+checkNum('valeur conservee hors ligne', $t['power'], 2577.0);
+
+/* Aucune valeur connue : surtout pas de zéro. Un équipement qui vient d'être
+ * créé affirmerait produire 0 W alors qu'il ne sait rien encore. */
+$eq = device(solplanetbe::TYPE_INVERTER);
+$t = json_decode($eq->buildResume(array(), false), true);
+check('sans donnees : puissance nulle et non zero', $t['power'], null);
+check('sans donnees : energie nulle et non zero', $t['total'], null);
+
+$eq = device(solplanetbe::TYPE_METER);
+$t = json_decode($eq->buildResume($eq->values(fixture('meter')), true), true);
+check('compteur : type', $t['type'], 'meter');
+checkNum('compteur : puissance signee conservee', $t['power'], -1840.0);
+checkNum('compteur : injection du jour', $t['export_today'], 11.32);
+
+$eq = device(solplanetbe::TYPE_BATTERY);
+$t = json_decode($eq->buildResume($eq->values(fixture('battery')), true), true);
+checkNum('batterie : etat de charge', $t['soc'], 74.0);
+checkNum('batterie : puissance signee', $t['power'], 1164.0);
+check('batterie : etat', $t['status'], 'En charge');
+
+/* La valeur atterrit entre apostrophes dans un bloc de script : ni apostrophe,
+ * ni chevron ne doivent en sortir vivants. */
+$brut = $eq->buildResume(array('etat' => 'Ok\'; alert(1); //', 'libelle_erreur' => '</scr' . 'ipt>'), true);
+check('apostrophe echappee', strpos($brut, "'") === false, true);
+check('chevron echappe', strpos($brut, '<') === false, true);
+check('json toujours lisible', is_array(json_decode($brut, true)), true);
+
 /* =========================================================== NOMS DE COMMANDES */
 section('Noms de commandes');
 
@@ -300,7 +387,10 @@ $apostrophes = array();
 $doublons = array();
 foreach (array(solplanetbe::TYPE_INVERTER, solplanetbe::TYPE_METER, solplanetbe::TYPE_BATTERY) as $type) {
     $eq = device($type, array('phases' => 3, 'mppt' => 4));
-    $vus = array();
+    $vus = array($eq->tileName() => true, 'Rafraîchir' => true);
+    if (strpos($eq->tileName(), "'") !== false) {
+        $apostrophes[] = $type . ' / ' . $eq->tileName();
+    }
     foreach ($eq->catalog() as $logicalId => $definition) {
         if (strpos($definition[0], "'") !== false) {
             $apostrophes[] = $type . ' / ' . $definition[0];
