@@ -1,0 +1,34 @@
+{
+    "id": "solplanetbe",
+    "name": "Solplanet",
+    "pluginVersion": "0.1",
+    "description": {
+        "fr_FR": "Relève en réseau local les onduleurs photovoltaïques Solplanet équipés d'une clé de communication AiSWEI, sans passer par le cloud du constructeur. Le plugin découvre les appareils présents derrière une adresse IP — onduleur, compteur bidirectionnel, batterie — et crée pour chacun un équipement dont les commandes sont relevées par un cron à l'intervalle que vous choisissez : puissance instantanée, énergie du jour et totale, tension et courant par phase et par chaîne photovoltaïque, température, état de charge de la batterie, soutirage et injection réseau. Les valeurs sont mises à l'échelle et historisables, donc utilisables directement dans les widgets énergie, les scénarios et les courbes de Jeedom.",
+        "en_US": "Reads Solplanet photovoltaic inverters fitted with an AiSWEI communication stick over the local network, without going through the manufacturer's cloud. The plugin discovers the devices behind an IP address — inverter, bidirectional meter, battery — and creates one Jeedom device for each, whose commands are polled by a cron at the interval you choose: instant power, daily and total energy, voltage and current per phase and per PV string, temperature, battery state of charge, grid import and export. Values are scaled and can be historized, so they work directly in Jeedom energy widgets, scenarios and charts."
+    },
+    "licence": "AGPL",
+    "author": "sMug (Jérôme Fafchamps)",
+    "require": "4.4",
+    "requireOsVersion": "11",
+    "category": "energy",
+    "index": "solplanetbe",
+    "hasDependency": 0,
+    "hasOwnDeamon": 0,
+    "maxDependancyInstallTime": 5,
+    "eventjs": 0,
+    "issue": "https://github.com/replicatorbe/jeedom-plugin-solplanetbe/issues",
+    "documentation": "https://github.com/replicatorbe/jeedom-plugin-solplanetbe/blob/master/docs/#language#/index.md",
+    "documentation_beta": "https://github.com/replicatorbe/jeedom-plugin-solplanetbe/blob/beta/docs/#language#/index.md",
+    "changelog": "https://github.com/replicatorbe/jeedom-plugin-solplanetbe/blob/master/docs/#language#/changelog.md",
+    "changelog_beta": "https://github.com/replicatorbe/jeedom-plugin-solplanetbe/blob/beta/docs/#language#/changelog.md",
+    "language": [
+        "fr_FR",
+        "en_US"
+    ],
+    "compatibility": [
+        "smart",
+        "rpi",
+        "docker",
+        "diy"
+    ]
+}

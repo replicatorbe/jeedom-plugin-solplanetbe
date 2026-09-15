@@ -1,0 +1,5 @@
+# Jeux d'essai et rejeu hors ligne : outils de développement, inutiles côté
+# Jeedom. Les fixtures gardent une trace des réponses du stick AiSWEI — un
+# onduleur monophasé, un triphasé, un hybride avec batterie — pour pouvoir
+# rejouer le décodage sans matériel sous la main.
+tests/
