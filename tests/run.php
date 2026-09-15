@@ -104,6 +104,35 @@ check('libellé d\'erreur', $v['libelle_erreur'], 'Aucune erreur');
  * absente rend null et n'écrit rien. */
 check('pas de seconde phase', isset($v['tension_ac_2']), false);
 
+/* ============================================ RELEVÉ RÉEL : ASW3000S-S */
+section('Relevé réel d\'un ASW3000S-S, monophasé, une chaîne');
+
+/* Capture prise sur une installation en service, en pleine production. Elle sert
+ * moins à vérifier des nombres qu'à recouper les facteurs d'échelle entre eux :
+ * si l'un d'eux est faux, les trois égalités physiques ci-dessous cessent
+ * simultanément d'être vraies, alors qu'une valeur isolée reste plausible. */
+$raw = fixture('inverter_asw3000s');
+$eq = device(solplanetbe::TYPE_INVERTER);
+$v = $eq->values($raw);
+
+check('une seule phase détectée', isset($v['tension_ac_2']), false);
+check('tension réseau', $v['tension_ac_1'], 244.4);
+check('énergie totale', $v['energie_totale'], 14668.4);
+check('température', $v['temperature'], 57.0);
+
+/* Tension x courant côté continu doit retrouver la puissance alternative, au
+ * rendement de l'onduleur près. Deux pour cent d'écart valident d'un coup le
+ * dixième de volt sur vpv ET le centième d'ampère sur ipv. */
+$ecartPv = abs($v['puissance_pv_1'] - $v['puissance']) / $v['puissance'];
+check('puissance PV calculée cohérente avec la puissance AC', $ecartPv < 0.02, true);
+
+/* Même recoupement côté alternatif, contre la puissance apparente annoncée. */
+$ecartVa = abs($v['tension_ac_1'] * $v['courant_ac_1'] - $v['puissance_apparente']) / $v['puissance_apparente'];
+check('Vac x Iac cohérent avec la puissance apparente', $ecartVa < 0.02, true);
+
+/* Et le facteur de puissance doit être le rapport des deux puissances. */
+check('facteur de puissance cohérent', round($v['puissance'] / $v['puissance_apparente'], 2), 0.88);
+
 /* ======================================================= ONDULEUR TRIPHASÉ */
 section('Onduleur triphasé, trois chaînes');
 
