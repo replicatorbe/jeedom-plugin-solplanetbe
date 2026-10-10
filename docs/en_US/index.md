@@ -31,6 +31,8 @@ Manual creation is still possible: device type, IP address, inverter serial
 number. The serial number appears in the Solplanet application, or in the
 discovery answer.
 
+![Inverter configuration](../images/configuration-onduleur.png)
+
 ### Finding the stick's address
 
 It is the address your router gives to the module plugged into the inverter, not
@@ -52,6 +54,8 @@ serial number.
 Each device shows **one tile only**. That is a deliberate choice: nineteen
 stacked widgets cannot be read, whereas an inverter asks a single question —
 "how much is it producing?" — and a tile answers it in full.
+
+![The inverter tile](../images/tuile-onduleur.png)
 
 The inverter tile shows instant power large, a gauge against rated power
 (2.50 kW on a 3 kW inverter is 83 %; the figure alone would not say so), daily

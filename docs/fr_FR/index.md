@@ -33,6 +33,8 @@ L'ajout à la main reste possible : type d'appareil, adresse IP, numéro de sér
 de l'onduleur. Le numéro de série est visible dans l'application Solplanet, ou
 dans la réponse de la découverte.
 
+![Configuration d'un onduleur](../images/configuration-onduleur.png)
+
 ### Trouver l'adresse de la clé
 
 C'est celle que votre box attribue au module branché sur l'onduleur, pas celle
@@ -54,6 +56,8 @@ série de l'onduleur.
 Chaque équipement n'affiche **qu'une tuile**. C'est un choix : dix-neuf widgets
 empilés ne se lisent pas, alors qu'un onduleur pose une question unique — « ça
 produit combien ? » — et une tuile y répond en entier.
+
+![La tuile de l'onduleur](../images/tuile-onduleur.png)
 
 La tuile de l'onduleur montre la puissance instantanée en grand, une jauge par
 rapport à la puissance nominale (2,50 kW sur un onduleur de 3 kW, c'est 83 % ;

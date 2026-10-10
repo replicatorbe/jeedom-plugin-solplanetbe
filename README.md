@@ -7,6 +7,8 @@ Le plugin découvre ce qui répond derrière l'adresse IP de la clé — onduleu
 compteur bidirectionnel, batterie — et crée un équipement Jeedom pour chacun.
 Un cron les relève ensuite à l'intervalle choisi, de la minute à la demi-heure.
 
+![La tuile de l'onduleur](docs/images/tuile-onduleur.png)
+
 ## Ce qu'il remonte
 
 - **Onduleur** : puissance, énergie du jour et totale, tension et courant par
